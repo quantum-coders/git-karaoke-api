@@ -1,0 +1,435 @@
+// This is your Prisma schema file for MySQL
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Repositorios de GitHub
+model Repository {
+  id          Int     @id @default(autoincrement())
+  // Información principal del repositorio
+  owner       String
+  name        String
+  full_name   String  @unique // owner/name        @map("full_name")
+  description String? @db.Text
+  url         String
+
+  // Metadatos del repositorio
+  created_at      DateTime @map("created_at")
+  updated_at      DateTime @map("updated_at")
+  last_fetched_at DateTime @default(now()) @map("last_fetched_at")
+  is_private      Boolean  @default(false) @map("is_private")
+  stars           Int      @default(0)
+  forks           Int      @default(0)
+  watchers        Int      @default(0)
+
+  // Propiedades adicionales
+  default_branch String  @default("main") @map("default_branch")
+  language       String?
+  topics         Json?
+
+  // Relaciones
+  commits        Commit[]
+  branches       Branch[]
+  tags           Tag[]
+  songs          Song[]
+  analysis_tasks AnalysisTask[] @relation("RepositoryToAnalysisTask")
+
+  // Metadatos adicionales serializados
+  meta_data Json? @map("meta_data")
+
+  // Índices para búsquedas eficientes
+  @@index([owner, name])
+  @@index([last_fetched_at])
+  @@map("repositories")
+}
+
+// Ramas de un repositorio
+model Branch {
+  id   Int    @id @default(autoincrement())
+  name String
+  sha  String
+
+  // Relaciones
+  repository    Repository @relation(fields: [repository_id], references: [id], onDelete: Cascade)
+  repository_id Int        @map("repository_id")
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@unique([repository_id, name])
+  @@map("branches")
+}
+
+// Tags de un repositorio
+model Tag {
+  id   Int    @id @default(autoincrement())
+  name String
+  sha  String
+
+  // Relaciones
+  repository    Repository @relation(fields: [repository_id], references: [id], onDelete: Cascade)
+  repository_id Int        @map("repository_id")
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@unique([repository_id, name])
+  @@map("tags")
+}
+
+// Commits de un repositorio
+model Commit {
+  id Int @id @default(autoincrement())
+
+  // Información principal del commit
+  sha           String
+  message       String @db.Text
+  short_message String @db.VarChar(255) @map("short_message") // Resumen del mensaje
+  url           String
+
+  // Información sobre autor y committer
+  author_name     String    @map("author_name")
+  author_email    String    @map("author_email")
+  author_date     DateTime  @map("author_date")
+  committer_name  String?   @map("committer_name")
+  committer_email String?   @map("committer_email")
+  committer_date  DateTime? @map("committer_date")
+
+  // Estadísticas del commit
+  additions     Int @default(0)
+  deletions     Int @default(0)
+  changed_files Int @default(0) @map("changed_files")
+
+  // Contenido serializado del commit
+  diff  String? @db.LongText
+  patch String? @db.LongText
+
+  // Relaciones
+  repository    Repository   @relation(fields: [repository_id], references: [id], onDelete: Cascade)
+  repository_id Int          @map("repository_id")
+  files         CommitFile[]
+  embeddings    Embedding[]
+
+  // Datos de embedding
+  embedding_id String? @unique @map("embedding_id") // Referencia al embedding en ChromaDB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  // Metadatos adicionales serializados
+  meta_data Json? @map("meta_data")
+
+  @@unique([repository_id, sha])
+  @@index([author_date])
+  @@index([author_email])
+  @@map("commits")
+}
+
+// Archivos modificados en un commit
+model CommitFile {
+  id Int @id @default(autoincrement())
+
+  // Información del archivo
+  filename  String @db.VarChar(512)
+  status    String // added, modified, removed, renamed
+  additions Int    @default(0)
+  deletions Int    @default(0)
+  changes   Int    @default(0)
+
+  // Contenido del diff
+  patch String? @db.LongText
+
+  // Relaciones
+  commit    Commit @relation(fields: [commit_id], references: [id], onDelete: Cascade)
+  commit_id Int    @map("commit_id")
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@index([filename])
+  @@index([commit_id])
+  @@map("commit_files")
+}
+
+// Embeddings almacenados y su relación con ChromaDB
+model Embedding {
+  id Int @id @default(autoincrement())
+
+  // Información del embedding
+  external_id     String @unique @map("external_id") // ID en ChromaDB
+  collection_name String @map("collection_name") // Nombre de la colección en ChromaDB
+  vector_size     Int    @default(1536) @map("vector_size")
+
+  // Contenido que se embebió
+  content      String @db.LongText
+  content_type String @default("commit") @map("content_type") // commit, file, summary, etc.
+
+  // Relaciones
+  commit    Commit? @relation(fields: [commit_id], references: [id], onDelete: SetNull)
+  commit_id Int?    @map("commit_id")
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  // Metadatos adicionales serializados
+  meta_data Json? @map("meta_data")
+
+  @@index([collection_name])
+  @@index([content_type])
+  @@map("embeddings")
+}
+
+// Tareas de análisis de repositorios
+model AnalysisTask {
+  id Int @id @default(autoincrement())
+
+  // Información de la tarea
+  task_type  String    @map("task_type") // repo_analysis, commit_analysis, song_generation
+  status     String // pending, processing, completed, failed
+  start_date DateTime? @map("start_date") // Fecha de inicio del análisis
+  end_date   DateTime? @map("end_date") // Fecha de fin del análisis
+
+  // Parámetros de la tarea
+  params Json?
+
+  // Resultados de la tarea
+  results Json?
+  error   String? @db.Text
+
+  // Relaciones
+  repository    Repository @relation("RepositoryToAnalysisTask", fields: [repository_id], references: [id], onDelete: Cascade)
+  repository_id Int        @map("repository_id")
+  song          Song?      @relation(fields: [song_id], references: [id])
+  song_id       Int?       @map("song_id")
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([task_type])
+  @@index([created_at])
+  @@map("analysis_tasks")
+}
+
+// Modelo de canciones generadas
+model Song {
+  id Int @id @default(autoincrement())
+
+  // Información principal de la canción
+  title        String
+  lyrics       String  @db.LongText
+  style        String?
+  instrumental Boolean @default(false)
+
+  // IDs externos
+  suno_task_id    String? @unique @map("suno_task_id") // ID de tarea en Suno
+  cover_image_url String? @map("cover_image_url")
+  // Estado de generación
+  status          String // pending, processing, completed, failed
+
+  // Relaciones
+  repository     Repository     @relation(fields: [repository_id], references: [id], onDelete: Cascade)
+  repository_id  Int            @map("repository_id")
+  audio_files    AudioFile[]
+  analysis_tasks AnalysisTask[]
+
+  // Parámetros y resultados
+  time_range   Json?   @map("time_range") // Rango de tiempo de commits analizados
+  commit_count Int     @default(0) @map("commit_count")
+  prompt       String? @db.Text // Prompt usado para generar la canción
+
+  // Timestamps
+  created_at   DateTime  @default(now()) @map("created_at")
+  updated_at   DateTime  @updatedAt @map("updated_at")
+  completed_at DateTime? @map("completed_at")
+
+  // Metadatos adicionales serializados
+  meta_data Json? @map("meta_data")
+
+  @@index([status])
+  @@index([created_at])
+  @@map("songs")
+}
+
+// Archivos de audio generados
+model AudioFile {
+  id Int @id @default(autoincrement())
+
+  // Información del archivo
+  filename  String
+  url       String
+  duration  Float?
+  file_size Int?   @map("file_size")
+
+  // Tipos y propiedades del audio
+  file_type   String  @map("file_type") // mp3, wav
+  mime_type   String  @map("mime_type")
+  is_vocal    Boolean @default(true) @map("is_vocal") // true=con voz, false=instrumental
+  is_original Boolean @default(true) @map("is_original") // true=original, false=procesado
+
+  // IDs externos
+  suno_audio_id String? @map("suno_audio_id")
+
+  // Relaciones
+  song          Song        @relation(fields: [song_id], references: [id], onDelete: Cascade)
+  song_id       Int         @map("song_id")
+  attachment    Attachment? @relation(fields: [attachment_id], references: [id])
+  attachment_id Int?        @unique @map("attachment_id")
+
+  // Contenido adicional
+  lyrics_timestamps Json? @map("lyrics_timestamps") // Timestamps para letras sincronizadas
+  waveform_data     Json? @map("waveform_data") // Datos de forma de onda para visualización
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@index([song_id])
+  @@map("audio_files")
+}
+
+// API Calls para optimizar y evitar peticiones duplicadas
+model ApiCall {
+  id Int @id @default(autoincrement())
+
+  // Información de la petición
+  service  String // github, openai, suno, chroma
+  endpoint String
+  method   String @default("GET")
+
+  // Parámetros y respuesta
+  params   Json?
+  response Json?
+
+  // Hash para identificar llamadas duplicadas
+  request_hash String @unique @map("request_hash") // Hash de la petición (método+endpoint+parámetros)
+
+  // Estado y resultados
+  status_code   Int?    @map("status_code")
+  is_success    Boolean @default(true) @map("is_success")
+  error_message String? @db.Text @map("error_message")
+
+  // Tiempos y rendimiento
+  request_time  DateTime  @map("request_time")
+  response_time DateTime? @map("response_time")
+  duration      Int? // Duración en ms
+
+  // Caché y expiración
+  expires_at DateTime? @map("expires_at")
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@index([service, endpoint])
+  @@index([request_hash])
+  @@index([expires_at])
+  @@map("api_calls")
+}
+
+// Modelo auxiliar para adjuntos (archivos guardados)
+model Attachment {
+  id Int @id @default(autoincrement())
+
+  // Información del archivo
+  name       String
+  slug       String @unique
+  url        String
+  attachment String // Ruta relativa (upload/año/mes/archivo)
+  mime       String
+  size       Int
+  source     String @default("digitalocean") // digitalocean, local, etc.
+  acl        String @default("public-read")
+
+  // Metadatos adicionales serializados
+  metas Json?
+
+  // Relaciones
+  audio_file AudioFile?
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@index([created_at])
+  @@index([source])
+  @@map("attachments")
+}
+
+// Contadores y límites de API para prevenir excesos
+model ApiLimit {
+  id Int @id @default(autoincrement())
+
+  // Información del servicio
+  service String @unique // github, openai, suno, chroma
+
+  // Límites y contadores
+  requests_limit Int      @map("requests_limit")
+  requests_used  Int      @default(0) @map("requests_used")
+  requests_reset DateTime @map("requests_reset")
+
+  // Información adicional
+  cost_per_request Float? @map("cost_per_request") // Para servicios de pago
+  total_cost       Float? @map("total_cost") // Costo acumulado
+
+  // Configuración
+  is_active Boolean @default(true) @map("is_active")
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@index([service])
+  @@map("api_limits")
+}
+
+// Configuración y ajustes del sistema
+model AppSetting {
+  id Int @id @default(autoincrement())
+
+  // Clave-valor para configuraciones
+  key         String  @unique
+  value       String  @db.Text
+  description String? @db.Text
+
+  // Tipo de configuración
+  category String
+  type     String @default("string") // string, number, boolean, json
+
+  // Control de acceso
+  is_secret    Boolean @default(false) @map("is_secret")
+  is_read_only Boolean @default(false) @map("is_read_only")
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@map("app_settings")
+}
+
+model MusicStyle {
+  id          Int     @id @default(autoincrement())
+  name        String // "Rock", "Pop", etc.
+  slug        String? @unique
+  description String?
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@map("music_styles")
+}
