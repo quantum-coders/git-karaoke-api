@@ -23,10 +23,27 @@ class KaraokeController {
 	 */
 	static async getAvailableStyles(req, res) {
 		try {
-			// Si prefieres, obtén desde la tabla "musicStyle":
-			// const records = await primate.prisma.musicStyle.findMany();
-			// const styles = records.map(r => r.name);
-			const styles = [ 'Rock', 'Pop', 'Reggaeton', 'Metal', 'Electronic', 'Classical' ];
+			// Lista muy amplia de estilos musicales
+			const styles = [
+				'Rock', 'Pop', 'Hip-Hop', 'Rap', 'Reggaeton', 'Electronic', 'Classical',
+				'Jazz', 'Blues', 'Country', 'Folk', 'Metal', 'Punk', 'Alternative', 'Indie',
+				'Funk', 'Soul', 'R&B', 'Disco', 'House', 'Techno', 'Trance', 'Dubstep', 'Ambient',
+				'Industrial', 'Experimental', 'Ska', 'Gospel', 'Latin', 'Dance', 'World', 'Reggae',
+				'K-Pop', 'J-Pop', 'Fado', 'Cumbia', 'Salsa', 'Bachata', 'Merengue', 'Zouk',
+				'Afrobeat', 'Highlife', 'Jungle', 'Drum & Bass', 'Trap', 'Electro', 'Synthpop',
+				'New Wave', 'Grunge', 'Progressive Rock', 'Psychedelic Rock', 'Lo-fi', 'Chillhop',
+				'Tribal', 'Orchestral', 'Acoustic', 'Ambient Pop', 'Alternative R&B', 'Dub',
+				'Hard Rock', 'Post-Punk', 'Emo', 'Shoegaze', 'Noise', 'Neo-Soul', 'Bossa Nova',
+				'Samba', 'Bollywood', 'World Fusion', 'Experimental Electronic', 'Future Bass',
+				'Breakbeat', 'Bassline', 'Drill', 'Lo-fi Hip-Hop', 'Chillwave', 'Vaporwave',
+				'Synthwave', 'Electropop', 'Electro Swing', 'Tropical House', 'Moombahton',
+				'Garage', 'UK Funky', 'Disco House', 'Nu-Disco', 'Deep House', 'Progressive House',
+				'Tech House', 'Electro House', 'Bass House', 'Future House', 'Big Room',
+				'Hardstyle', 'Happy Hardcore', 'Gabber', 'Melodic Dubstep', 'Future Garage',
+				'Glitch Hop', 'IDM', 'Ambient Techno', 'Downtempo', 'Chillout', 'Balearic Beat',
+				'Meditative', 'Cinematic', 'Ethnic', 'Polka', 'March', 'Opera', 'Baroque',
+				'Renaissance', 'Contemporary Classical',
+			];
 
 			return res.respond({
 				data: styles,
@@ -139,6 +156,8 @@ class KaraokeController {
 	 *  - orderBy? => "title", "status", "created_at", ...
 	 *  - orderDir? => "asc" o "desc"
 	 */
+	// karaoke.controller.js
+
 	static async getAllSongs(req, res) {
 		try {
 			// 1. Leer query params
@@ -179,13 +198,17 @@ class KaraokeController {
 			// 4. Contar total para la paginación
 			const totalCount = await primate.prisma.song.count({ where: whereClause });
 
-			// 5. Obtener los registros
+			// 5. Obtener los registros enriquecidos, incluyendo repository, audio_files y analysis_tasks
 			const songs = await primate.prisma.song.findMany({
 				where: whereClause,
 				orderBy: { [sortColumn]: sortDir },
 				skip: parseInt(offset, 10),
 				take: parseInt(limit, 10),
-				//  include: { audio_files: true } // si quieres traerlo todo de golpe
+				include: {
+					repository: true,        // Datos del repositorio
+					audio_files: true,       // Archivos de audio asociados
+					analysis_tasks: true,    // Tareas de análisis relacionadas
+				},
 			});
 
 			// 6. Respuesta

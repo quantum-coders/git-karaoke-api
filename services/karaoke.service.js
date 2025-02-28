@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
+// 1) Importa slugify si no lo tienes, o reúsalo dentro:
+import slugify from 'slugify';
 
 import GithubService from '#services/github.service.js';
 import ChromaService from '#services/chroma.service.js';
@@ -393,16 +395,32 @@ ${ doc.substring(doc.indexOf('Changes:') + 8) }
 
 			const sunoTaskId = songGenerationResponse.data.taskId;
 			console.log('🎉 Song generation task initiated with ID:', sunoTaskId);
-			const coverPrompt = `A ${ musicStyle } album cover, futuristic code style. Inspired by software commits, for the song: "${ songTitle }". Vibrant digital art.`;
+			const coverPrompt = `Genera una imagen que represente el titulo de la cancion "${ songTitle }" en un estilo comico sin incluir ninguna palabras olo una imagen mnuy graciosa representativa del nombre de la cacnion y del estilo de musica "${ musicStyle }".`.trim();
+			console.log('🖼️ [DEBUG] Iniciando generación de imagen con prompt:', coverPrompt);
+			let coverAttachment = null;  // Declarada fuera del try
 
-			// 2) Llamamos a AIService para generar la portada y subirla
-			const coverAttachment = await AIService.generateCoverImage(coverPrompt, {
-				size: '512x512',
-				model: 'dall-e-2',
-			});
+			try {
+				coverAttachment = await AIService.generateCoverImage(coverPrompt, {
+					size: '512x512',
+					model: 'dall-e-2',
+				});
+				console.log('✅ [DEBUG] Imagen generada y guardada con éxito:', coverAttachment);
+			} catch(error) {
+				console.error('❌ [DEBUG] Error al generar o guardar la imagen:', error.message);
+				throw error;
+			}
+
+			console.log('💽 [KaraokeService] Storing new song record in DB...');
+
+			console.log('💽 [KaraokeService] Storing new song record in DB...');
+
 			// [Opcional] Guardar en DB la canción con status pending
 			// Ejemplo: crear un registro en la tabla Song con suno_task_id, etc.
 			console.log('💽 [KaraokeService] Storing new song record in DB...');
+			// imprime
+			console.log("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMETAS", coverAttachment.metas)
+			// IMAGEN QUE GUARDAM;OS
+			console.log("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMETAS", coverAttachment.metas?.location)
 			const newSong = await prisma.song.create({
 				data: {
 					title: songTitle,
@@ -410,7 +428,7 @@ ${ doc.substring(doc.indexOf('Changes:') + 8) }
 					style: musicStyle,
 					instrumental,
 					suno_task_id: sunoTaskId,
-					cover_image_url: coverAttachment.url,
+					cover_image_url: coverAttachment?.metas?.location || null,
 					status: 'pending',
 					repository: {
 						connect: {
@@ -502,12 +520,16 @@ ${ doc.substring(doc.indexOf('Changes:') + 8) }
 			for(const info of savedFiles) {
 				// 3a) Si tenemos filePath, significa que SÍ guardaste en disco local
 				if(info.filePath) {
-					console.log(`🔼 [KaraokeService] Uploading local file "${ info.filePath }" to DO Space...`);
 					const fileBuffer = fs.readFileSync(info.filePath);
 					const mimeType = 'audio/mpeg';
 
+					// slugificar el título, por ejemplo:
+					const safeTitle = slugify(songRecord.title, { lower: true, strict: true });
+					// Ojo: si no quieres tildes, acentos, etc., "strict: true" elimina símbolos raros
+
 					const uploadFile = {
-						originalname: path.basename(info.filePath),
+						// Aquí cambias originalname:
+						originalname: `${ safeTitle }.mp3`,   // o con guiones, etc.
 						mimetype: mimeType,
 						buffer: fileBuffer,
 						size: fileBuffer.length,

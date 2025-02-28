@@ -13,10 +13,10 @@ class AIService {
 	 */
 	static async generateCoverImage(prompt, options = {}) {
 		const {
-			size = '512x512',         // puede ser 256x256, 512x512, 1024x1024 (DALL-E v2)
-			model = 'dall-e-2',      // o 'dall-e-3' si tienes acceso
-			n = 1,                   // solo 1 imagen
-			responseFormat = 'url',  // 'url' o 'b64_json'
+			size = '512x512',
+			model = 'dall-e-2',
+			n = 1,
+			responseFormat = 'url',
 		} = options;
 
 		if(!prompt) {
@@ -24,7 +24,10 @@ class AIService {
 		}
 
 		try {
-			// 1) Llamada a OpenAI /images/generations
+			console.log('🚀 [AIService] Iniciando generación de imagen...');
+			console.log('📝 Prompt:', prompt);
+			console.log('🛠️ Opciones:', options);
+
 			const endpoint = 'https://api.openai.com/v1/images/generations';
 			const headers = {
 				'Authorization': `Bearer ${ process.env.OPENAI_API_KEY }`,
@@ -39,25 +42,32 @@ class AIService {
 				response_format: responseFormat,
 			};
 
-			// (Opcional) Podrías guardar esta llamada en ApiCall para caching
-			// pero a modo simple, la hacemos directa:
+			console.log('📡 [AIService] Enviando solicitud a OpenAI:', endpoint);
 			const startTime = Date.now();
+
 			const response = await axios.post(endpoint, body, { headers });
+
 			const endTime = Date.now();
 
-			// parsear la respuesta
-			// Ejemplo: { created: 123456789, data: [{ url: '...'}, ... ]}
+			console.log('✅ [AIService] Respuesta recibida desde OpenAI en', endTime - startTime, 'ms');
+			console.log('📦 Respuesta:', JSON.stringify(response.data, null, 2));
+
 			const imageData = response.data?.data;
+
 			if(!imageData || imageData.length === 0) {
 				throw new Error('No se recibió URL de imagen de OpenAI');
 			}
+
 			const imageUrl = imageData[0].url;
+
 			if(!imageUrl) {
 				throw new Error('No se pudo extraer la URL de la imagen generada');
 			}
 
-			// 2) Subir a DO: crea un Attachment
-			//    Podemos usar la función createAttachmentFromUrl
+			console.log('🌐 URL de imagen generada:', imageUrl);
+
+			console.log('☁️ Subiendo imagen a DigitalOcean Spaces...');
+
 			const attachment = await UploadService.createAttachmentFromUrl(imageUrl, {
 				acl: 'public-read',
 				metas: {
@@ -69,10 +79,12 @@ class AIService {
 				},
 			});
 
-			// Retornamos el Attachment con .url, .id, etc.
+			console.log('🎉 Imagen subida exitosamente:', attachment.url);
+
 			return attachment;
+
 		} catch(error) {
-			console.error('❌ [AIService] Error generando imagen:', error.message);
+			console.error('❌ [AIService] Error generando imagen:', error);
 			throw new Error('Error generando cover image: ' + error.message);
 		}
 	}
