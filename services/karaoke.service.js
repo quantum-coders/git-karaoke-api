@@ -398,8 +398,7 @@ ${ doc.substring(doc.indexOf('Changes:') + 8) }
 
 			const sunoTaskId = songGenerationResponse.data.taskId;
 			console.log('🎉 Song generation task initiated with ID:', sunoTaskId);
-			const coverPrompt = `Genera una imagen que represente el titulo de la cancion "${ songTitle }" en un estilo comico sin incluir ninguna palabras olo una imagen mnuy graciosa representativa del nombre de la cacnion y del estilo de musica "${ musicStyle }".`.trim();
-			console.log('🖼️ [DEBUG] Iniciando generación de imagen con prompt:', coverPrompt);
+const coverPrompt = `As an expert music cover artist, create a visually striking album cover based on the song title "${songTitle}" in the ${musicStyle} genre. The image should: 1) Capture the emotional essence of the song title without using text, 2) Reflect visual aesthetics associated with ${musicStyle}, 3) Use color palettes that evoke the mood of both the title and genre, 4) Feature balanced composition with a clear focal point, 5) Include symbolic imagery referencing the song title, 6) Be in square format, 7) Avoid text, logos, watermarks, or recognizable faces, 8) Have a unique artistic style, 9) Use lighting, texture, and depth for visual interest, 10) Be appropriate for general audiences while being creative. Create a professional album cover that communicates the essence of the music through visuals alone.`.trim();			console.log('🖼️ [DEBUG] Iniciando generación de imagen con prompt:', coverPrompt);
 			let coverAttachment = null;  // Declarada fuera del try
 
 			try {
