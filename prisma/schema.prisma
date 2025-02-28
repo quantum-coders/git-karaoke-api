@@ -236,7 +236,7 @@ model Song {
 
   // IDs externos
   suno_task_id    String? @unique @map("suno_task_id") // ID de tarea en Suno
-  cover_image_url String? @map("cover_image_url")
+  cover_image_url String? @map("cover_image_url") @db.varchar(512)
   // Estado de generación
   status          String // pending, processing, completed, failed
 
@@ -269,8 +269,8 @@ model AudioFile {
   id Int @id @default(autoincrement())
 
   // Información del archivo
-  filename  String
-  url       String
+  filename  String @db.varchar(512)
+  url       String @db.varchar(512)
   duration  Float?
   file_size Int?   @map("file_size")
 
@@ -347,8 +347,8 @@ model Attachment {
   // Información del archivo
   name       String
   slug       String @unique
-  url        String
-  attachment String // Ruta relativa (upload/año/mes/archivo)
+  url        String @db.varchar(512)
+  attachment String @db.varchar(512)
   mime       String
   size       Int
   source     String @default("digitalocean") // digitalocean, local, etc.
