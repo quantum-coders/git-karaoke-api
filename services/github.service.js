@@ -901,6 +901,99 @@ class GithubService {
 		}
 	}
 
+	// github.service.js
+
+	// github.service.js
+
+	static async getCommitsByLastActivity(owner, repo) {
+		try {
+			// 1) Ver si tenemos repositorio en DB
+			const repository = await prisma.repository.findUnique({
+				where: { full_name: `${ owner }/${ repo }` },
+				select: { id: true },
+			});
+
+			// 2) Si el repo no existe, no pasa nada, seguimos.
+			//    (Opcional: podrías crearlo vacío; depende de tu lógica)
+			if(!repository) {
+				console.warn(`[GithubService] No repository in DB for ${ owner }/${ repo }. Creating partial record if needed...`);
+				// ...podrías, por ejemplo, crear la entrada en la DB,
+				// o simplemente continuar sin DB
+			}
+
+			// 3) Buscamos en DB el último commit guardado
+			const lastCommit = repository
+				? await prisma.commit.findFirst({
+					where: { repository_id: repository.id },
+					orderBy: { author_date: 'desc' },
+				})
+				: null;
+
+			// 4) Si ya hay un “último commit” en la DB
+			if(lastCommit) {
+				// Restamos 3 días si quieres incluir un “buffer”
+				const sinceDate = new Date(lastCommit.author_date);
+				sinceDate.setDate(sinceDate.getDate() - 3);
+
+				const untilDate = new Date();
+				console.log(
+					`[GithubService] lastActivity: from ${ sinceDate.toISOString() } to ${ untilDate.toISOString() }`,
+				);
+
+				return this.getAllCommitsInDateRange(owner, repo, {
+					since: sinceDate.toISOString(),
+					until: untilDate.toISOString(),
+				});
+			}
+
+			// 5) Si NO hay commits en DB,
+			//    obtenemos de GitHub el “commit más reciente” (HEAD)
+			console.log(`[GithubService] No commits in DB. Fetching HEAD commit from GitHub...`);
+
+			const newestCommits = await this.getCommits(owner, repo, {
+				perPage: 1,
+				page: 1,
+			});
+			// “getCommits” suele traer ordenado por fecha DESC,
+			// así que newestCommits[0] sería el último commit en HEAD
+
+			if(!newestCommits || newestCommits.length === 0) {
+				// Repo vacío o privado sin acceso, etc.
+				console.warn('[GithubService] Repo has no commits at all (empty?) Returning [].');
+				return [];
+			}
+
+			// 6) Tenemos un commit HEAD. Tomamos su fecha
+			const headCommit = newestCommits[0];
+			const headDateString = headCommit.commit?.author?.date
+				|| headCommit.committer?.date
+				|| null;
+
+			if(!headDateString) {
+				console.warn('[GithubService] Could not parse date from the HEAD commit. Returning that single commit.');
+				return newestCommits; // O un array vacío, depende de ti
+			}
+
+			// 7) Convertir fecha y restarle 3 días si quieres buffer
+			const headDate = new Date(headDateString);
+			headDate.setDate(headDate.getDate() - 3);
+			const untilDate = new Date();
+
+			console.log(
+				`[GithubService] HEAD commit date: ${ headDateString }. Now fetching from ${ headDate.toISOString() } to ${ untilDate.toISOString() }`,
+			);
+
+			// 8) Finalmente: traer TODOS los commits de ese rango
+			return this.getAllCommitsInDateRange(owner, repo, {
+				since: headDate.toISOString(),
+				until: untilDate.toISOString(),
+			});
+		} catch(error) {
+			console.error('Error in getCommitsByLastActivity:', error);
+			throw error;
+		}
+	}
+
 	// Dentro de GithubService (o donde prefieras)
 	static summarizeCommits(owner, repo, commits) {
 		const commitCount = commits.length;

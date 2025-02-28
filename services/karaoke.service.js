@@ -125,6 +125,9 @@ ${ JSON.stringify(callbackData, null, 2) }
 				commits = await GithubService.getCommitsForThisWeek(owner, repo);
 			} else if(timeRange === 'custom' && startDate && endDate) {
 				commits = await GithubService.getCommitsInCustomInterval(owner, repo, startDate, endDate);
+			} else if(timeRange === 'lastActivity') {
+				// NUEVO BLOQUE para “última actividad”
+				commits = await GithubService.getCommitsByLastActivity(owner, repo);
 			} else {
 				throw new Error('Invalid time range or missing dates for custom range');
 			}
@@ -418,9 +421,9 @@ ${ doc.substring(doc.indexOf('Changes:') + 8) }
 			// Ejemplo: crear un registro en la tabla Song con suno_task_id, etc.
 			console.log('💽 [KaraokeService] Storing new song record in DB...');
 			// imprime
-			console.log("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMETAS", coverAttachment.metas)
+			console.log('MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMETAS', coverAttachment.metas);
 			// IMAGEN QUE GUARDAM;OS
-			console.log("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMETAS", coverAttachment.metas?.location)
+			console.log('MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMETAS', coverAttachment.metas?.location);
 			const newSong = await prisma.song.create({
 				data: {
 					title: songTitle,
