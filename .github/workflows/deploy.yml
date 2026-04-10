@@ -3,20 +3,99 @@ name: Deploy to Production
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
+        id: deploy
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             cd /var/www/git-karaoke-api
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             yarn install
             pm2 restart git-karaoke-api
 
+      - name: Pick success cyberpunk image
+        if: success()
+        id: img_success
+        run: |
+          PROMPTS=(
+            "epic%20cyberpunk%20victory%20neon%20city%20futuristic%20glowing%20art"
+            "cyberpunk%20samurai%20katana%20neon%20rain%20epic%20cinematic"
+            "futuristic%20cyberpunk%20skyline%20sunrise%20inspirational%20hopeful"
+            "cyberpunk%20phoenix%20rising%20neon%20fire%20victory%20rebirth"
+            "cyberpunk%20cathedral%20holy%20neon%20light%20epic%20divine"
+            "cyberpunk%20astronaut%20neon%20cosmos%20triumph%20stars"
+            "cyberpunk%20lone%20warrior%20victory%20neon%20stars%20epic"
+            "cyberpunk%20dragon%20neon%20sky%20glowing%20majestic"
+            "cyberpunk%20temple%20golden%20light%20neon%20serene%20epic"
+          )
+          PROMPT="${PROMPTS[$RANDOM % ${#PROMPTS[@]}]}"
+          SEED=$RANDOM$RANDOM
+          echo "url=https://image.pollinations.ai/prompt/${PROMPT}?width=1280&height=720&nologo=true&seed=${SEED}" >> $GITHUB_OUTPUT
+
+      - name: Pick failure cyberpunk image
+        if: failure()
+        id: img_failure
+        run: |
+          PROMPTS=(
+            "dark%20cyberpunk%20glitch%20broken%20dystopian%20rain%20noir"
+            "melancholic%20cyberpunk%20ruins%20neon%20fog%20alone%20dark"
+            "cyberpunk%20fallen%20warrior%20broken%20neon%20defeat%20rain"
+            "dystopian%20cyberpunk%20city%20rain%20noir%20red%20warning"
+            "glitched%20cyberpunk%20neon%20chaos%20warning%20error%20red"
+            "cyberpunk%20broken%20robot%20dystopia%20rain%20sad"
+            "cyberpunk%20void%20abyss%20neon%20despair%20red%20glitch"
+            "apocalyptic%20cyberpunk%20wasteland%20broken%20neon%20red"
+          )
+          PROMPT="${PROMPTS[$RANDOM % ${#PROMPTS[@]}]}"
+          SEED=$RANDOM$RANDOM
+          echo "url=https://image.pollinations.ai/prompt/${PROMPT}?width=1280&height=720&nologo=true&seed=${SEED}" >> $GITHUB_OUTPUT
+
+      - name: Notify success
+        if: success()
+        continue-on-error: true
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          photo: ${{ steps.img_success.outputs.url }}
+          format: markdown
+          message: |
+            ✅ *git-karaoke-api Deploy SUCCESS*
+
+            *Branch:* \`${{ github.ref_name }}\`
+            *Commit:* \`${{ github.sha }}\`
+            *Author:* ${{ github.actor }}
+            *Message:* ${{ github.event.head_commit.message }}
+
+            🚀 Live and running
+
+      - name: Notify failure
+        if: failure()
+        continue-on-error: true
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          photo: ${{ steps.img_failure.outputs.url }}
+          format: markdown
+          message: |
+            ❌ *git-karaoke-api Deploy FAILED*
+
+            *Branch:* \`${{ github.ref_name }}\`
+            *Commit:* \`${{ github.sha }}\`
+            *Author:* ${{ github.actor }}
+            *Message:* ${{ github.event.head_commit.message }}
+
+            [Ver logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
