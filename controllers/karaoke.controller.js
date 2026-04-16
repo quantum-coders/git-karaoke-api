@@ -69,7 +69,7 @@ class KaraokeController {
 			const globalConfig = {
 				defaultInstrumental: false,
 				maxCommits: 50,
-				defaultModel: 'gpt-4-turbo-preview',
+				defaultModel: 'gpt-4o',
 			};
 
 			return res.respond({

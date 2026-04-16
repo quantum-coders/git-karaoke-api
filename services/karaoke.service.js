@@ -168,9 +168,11 @@ ${ JSON.stringify(callbackData, null, 2) }
 					metadata: {
 						sha: commit.sha,
 						author: `${ commit.author.name } <${ commit.author.email }>`,
-						date: commit.date,
+						date: commit.date instanceof Date ? commit.date.toISOString() : String(commit.date),
 						message: commit.message,
-						stats: commit.stats,
+						additions: commit.stats?.additions ?? 0,
+						deletions: commit.stats?.deletions ?? 0,
+						total: commit.stats?.total ?? 0,
 					},
 				};
 			});
@@ -237,7 +239,7 @@ ${ JSON.stringify(callbackData, null, 2) }
 
 			console.log('🔍 Generating search query with AI');
 			const aiResponse = await AIService.sendMessage({
-				model: 'gpt-4-turbo-preview',
+				model: 'gpt-4o',
 				system: systemPrompt,
 				prompt: 'Generate a plain text searchQuery in JSON for relevant commits.',
 				temperature: 0.7,
@@ -298,7 +300,7 @@ ${ doc.substring(doc.indexOf('Changes:') + 8) }
       `;
 
 			const lyricsResponse = await AIService.sendMessage({
-				model: 'gpt-4-turbo-preview',
+				model: 'gpt-4o',
 				system: lyricsSystemPrompt,
 				prompt: `Write a ${ musicStyle } style song in JSON about these commits.`,
 				temperature: 0.8,
@@ -332,7 +334,7 @@ ${ doc.substring(doc.indexOf('Changes:') + 8) }
       `;
 
 			const titleResponse = await AIService.sendMessage({
-				model: 'gpt-4-turbo-preview',
+				model: 'gpt-4o',
 				system: titleSystemPrompt,
 				prompt: titlePrompt,
 				temperature: 0.8,
